@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <title>chatterbox</title>
     <link rel="stylesheet" href="styles/styles.css">
+    <link href="https://fonts.googleapis.com/css?family=Bree+Serif|Sarala" rel="stylesheet">
 
     <!-- dependencies -->
     <script src="bower_components/jquery/dist/jquery.js"></script>
@@ -21,41 +22,36 @@
     </script>
     <!-- your scripts -->
     <script src="env/config.js"></script>
-    <!-- <script src="scripts/app.js"></script> -->
+    <script src="scripts/app.js"></script>
   </head>
   <body>
     <div id="main">
       <h1>chatterbox</h1>
       <!-- Your HTML goes here! -->
-      <div>
-<!--         <ul id="roomSelect">
-          <li id="newRoom">New room...</li>
-          <li id="lobby">lobby</li>
-          <li id="Lobby1">Lobby1</li>
-          <li id="Lobby2">Lobby2</li>
-        </ul> -->
-        <label for="roomSelect" class="roomname">Room</label>
+      <div id="roomname">
+        <label for="roomSelect" class="roomname">Room:</label>
         <select id="roomSelect" name="chatroom">
-          <option value="" disabled selected hidden>Choose a chatroom</option>
-          <option value="lobby" selected="">Lobby</option>
-          <option id="val1" value="lobby">Lobby1</option>
-          <option value="lobby">Lobby2</option>
-          <option value="lobby">Lobby3</option>
-          <option value="lobby">Lobby4</option>
+          <!-- <option value="" disabled selected hidden>Choose a chatroom</option> -->
+          <option value="">Create new room</option>
         </select>
       </div>
-      <button type="submit" id="newRoom">Create a new room</button>
+      <!-- <button type="submit" id="newRoom">Create a new room</button> -->
       <div>
         <!-- create a text box for messages -->
-        <textarea id="writeComment" placeholder="What's on your mind?"></textarea>
+        <!-- <textarea id="writeComment" placeholder="What's on your mind?"></textarea> -->
+        <form action="#" id="send" method="post">
+          <input type="text" name="message" id="message">
+          <input type="submit" name="submit" class="submit">
+        </form>
         <!-- create a submit button -->
-        <button type="submit" id="submitBtn">Submit</button>
+        <!-- <button type="submit" id="submit">Submit</button> -->
       </div>
     </div>
-    <div class="roomname">
-      <div id="chats"></div>
-    </div>
-    <script src="scripts/app.js">
+    <div id="chats"></div>
+    <script>
+      $(function() {
+        app.init();
+      });
     </script>
   </body>
 </html>
