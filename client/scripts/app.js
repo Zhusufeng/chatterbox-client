@@ -3,62 +3,73 @@ var app = {
   server: 'http://parse.hrr.hackreactor.com/chatterbox/classes/messages',
   text: 'string',
   username: 'default',
-  roomname: 'Lobby'
+  roomname: 'lobby',
+  messages: [],
+  lastMessageId: 0,
+  friends: {}
 };
-
-// var username = escapeHTML(window.location.search.slice(10));
 
 app.init = function() {
 
   app.username = window.location.search.slice(10);
 
-  //when submit is pressed
-  $('#submitBtn').on('click', function() {
-    var message = {
-      username: username,
-      text: escapeHTML(document.getElementById('writeComment').value),
-      roomname: app.getRoomName()
-    };
-    //console.log(message);
-    // POST/send secure text to server
-    app.send(message);
-    // $("#writeComment").empty();
-    document.getElementById('writeComment').value = '';
-  });
+  app.$message = $('#message');
+  app.$chats = $('#chats');
+  app.$roomSelect = $('#roomSelect');
+  app.$send = $('#send');
 
-  app.getRoomName();
+  app.fetch();
+  //Add listeners
+  app.$send.on('submit', app.handleSubmit);
+  app.$roomSelect.on('change', app.handleRoomChange);
+  app.$chats.on('click', '.username', app.handleUsernameClick);
 
-  $('#newRoom').on('click', function() {
-    console.log($('#newRoom').text());
-    app.addRoom($('#newRoom').text());
-  });
+  setInterval(function() {
+    app.fetch();
+  }, 3000);
+
 
 };
 
-app.getRoomName = function() {
-  // Create new room when 'New room...' option is clicked
-  var currentRoom;
-  $('#roomSelect').on('change', function() {
-    //console.log(this);
-    var e = document.getElementById('roomSelect');
-    var newRoomName = e.options[e.selectedIndex].text;
-    // app.fetch();
-    app.renderRoom(newRoomName);
+// AJAX REQUESTS
+
+app.fetch = function() {
+  $.ajax({
+    url: app.server,
+    type: 'GET',
+    data: {
+      order: '-createdAt',
+      limit: 30
+    },
+    contentType: 'application/json',
+    success: function (data) {
+      console.log('chatterbox: Message received');
+      if (!data.results || !data.results.length) { return; }
+
+      app.messages = data.results;
+      var mostRecentMessage = app.messages[app.messages.length - 1];
+
+      if (mostRecentMessage.objectId !== app.lastMessageId) {
+        app.renderRoomList(app.messages);
+        app.renderMessages(app.messages);
+      }
+    },
+    error: function (data) {
+      // See: https://developer.mozilla.org/en-US/docs/Web/API/console.error
+      console.error('chatterbox: Failed to receive the message', data);
+    }
   });
-  var e = document.getElementById('roomSelect');
-  currentRoom = e.options[e.selectedIndex].text;
-  return currentRoom;
 };
 
 app.send = function(obj) {
-  var msgStringified = JSON.stringify(obj);
-
   $.ajax({
-    url: 'http://parse.hrr.hackreactor.com/chatterbox/classes/messages',
+    url: app.server,
     type: 'POST',
-    data: msgStringified,
+    data: JSON.stringify(obj),
     contentType: 'application/json',
     success: function (data) {
+      app.$message.val('');
+      app.fetch();
       console.log('chatterbox: Message sent');
     },
     error: function (data) {
@@ -68,90 +79,132 @@ app.send = function(obj) {
   });
 };
 
-app.fetch = function() {
-  $.ajax({
-    url: 'http://parse.hrr.hackreactor.com/chatterbox/classes/messages',
-    type: 'GET',
-    data: {
-      order: '-createdAt',
-      limit: 30
-    },
-    contentType: 'application/json',
-    success: function (data) {
-      console.log('chatterbox: Message received');
-      //app.renderRoom(data.results.roomname)
-      for (var i = 0; i < data.results.length; i++) {
-        console.log(data.results[i]);
 
-        app.renderMessage(data.results[i]);
+
+// MESSAGE RENDERING
+
+app.renderMessages = function(messages) {
+  app.clearMessages();
+
+  messages
+    .filter(function(message) {
+      if (app.roomname === 'lobby' && !message.roomname) {
+        return true;
+      } else if (message.roomname === app.roomname) {
+        return true;
+      } else {
+        return false;
       }
-      // app.renderMessage(data);
-    },
-    error: function (data) {
-      // See: https://developer.mozilla.org/en-US/docs/Web/API/console.error
-      console.error('chatterbox: Failed to receive the message', data);
-    }
-  });
+    })
+    .forEach(app.renderMessage);
 };
+
+app.renderMessage = function (message) {
+  var $chat = $('<div class="chat"/>');
+
+  var $username = $('<span class="username"/>');
+  $username.text(message.username + ': ')
+    .attr('data-username', message.username)
+    .appendTo($chat);
+
+  var $message = $('<br><span/>');
+  $message.text(message.text).appendTo($chat);
+
+  app.$chats.append($chat);
+};
+
+
 
 app.clearMessages = function() {
   $('#chats').empty();
-  //$('#chats').remove();
 };
 
-app.renderMessage = function(msgObj) {
-  var secName = '<p>' + escapeHTML(msgObj.username) + '</p>';
-  var secMsgText = '<p>' + escapeHTML(msgObj.text) + '</p>';
-  $('#chats').append(secName);
-  $('#chats').append(secMsgText);
+// HANDLE EVENTS
+
+app.handleUsernameClick = function(event) {
+  console.log('Username clicked');
+  var username = $(event.target).data('username');
+
+  if (username !== undefined) {
+    app.friends[username] = !app.friends[username];
+
+    var selector = '[data-username="' + username.replace(/"/g, '\\\"' + '"]');
+    var $usernames = $(selector).toggleClass('friend');
+  }
 };
 
-app.renderRoom = function(roomName) {
-  // $('#roomSelect').append('<li id="' + roomName +'">' + roomName + '</li>');
-  // Hide/clear whatever room you're in
-  app.clearMessages();
-  // Specify data wanted
-  // Get messages data for that room
-  app.fetch();
-  // Display messages data in room
+app.handleRoomChange = function(event) {
+  console.log('This start handleRoomChange');
+  var selectedIndex = app.$roomSelect.prop('selectedIndex');
+  if (selectedIndex === 0) {
+    var roomname = prompt('Enter new room name: ');
+
+    if (roomname) {
+      app.roomname = roomname;
+      app.renderRoom(roomname);
+      app.$roomSelect.val(roomname);
+    }
+  } else {
+    app.roomname = app.$roomSelect.val();
+  }
+
+  app.renderMessages(app.messages);
 };
 
-app.handleUsernameClick = function() {
-  $('#main').find('.username').click(function() {
-  // turn messages related to username into bold (addClass and use CSS)
-  });
+app.handleSubmit = function(event) {
+  console.log('Submit button pushed');
+  var message = {
+    username: app.username,
+    text: app.$message.val(),
+    roomname: app.roomname || 'lobby'
+  };
+
+  app.send(message);
+
+  event.preventDefault();
 };
 
-//when new room is clicked
-app.addRoom = function(roomName) {
-  //display a prompt box for room name input
-  var rmName = prompt('Enter new room name: ');
-  //escapeHTML the room name
-  var secureRoomName = escapeHTML(rmName);
-  $('#roomSelect').append('<option value="' + secureRoomName + '">' + secureRoomName + '</option>');
-  //take value from prompt and add to dropdown menu
-  app.renderRoom(secureRoomName);
+// ROOM METHODS
+
+app.renderRoomList = function(messages) {
+  if (messages) {
+    var rooms = {};
+    messages.forEach(function(message) {
+      var roomname = message.roomname;
+      if (roomname && !rooms[roomname]) {
+        app.renderRoom(roomname);
+
+        rooms[roomname] = true;
+      }
+    });
+  }
+  app.$roomSelect.val(app.roomname);
+};
+
+app.renderRoom = function(roomname) {
+  var $option = $('<option/>').val(roomname).text(roomname);
+
+  app.$roomSelect.append($option);
 };
 
 //escape html, meaning turn inserted messages into safe strings
-var entityMap = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  '"': '&quot;',
-  "'": '&#39;',
-  '/': '&#x2F;',
-  '`': '&#x60;',
-  '=': '&#x3D;'
-};
+// var entityMap = {
+//   '&': '&amp;',
+//   '<': '&lt;',
+//   '>': '&gt;',
+//   '"': '&quot;',
+//   "'": '&#39;',
+//   '/': '&#x2F;',
+//   '`': '&#x60;',
+//   '=': '&#x3D;'
+// };
 
-function escapeHTML(string) {
-  return String(string).replace(/[&<>"'`=\/]/g, function (s) {
-    return entityMap[s];
-  });
-}
+// function escapeHTML(string) {
+//   return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+//     return entityMap[s];
+//   });
+// }
 
-app.init();
 
 
 
